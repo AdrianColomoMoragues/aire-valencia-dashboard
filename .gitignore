@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+.streamlit/secrets.toml
+
+# Los datos se regeneran con el ETL: no se suben al repo
+data/

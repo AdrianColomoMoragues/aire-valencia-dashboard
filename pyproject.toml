@@ -1,0 +1,9 @@
+[project]
+name = "aire-valencia-dashboard"
+version = "0.1.0"
+description = "ETL + SQLite + dashboard Streamlit sobre la calidad del aire en València"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
