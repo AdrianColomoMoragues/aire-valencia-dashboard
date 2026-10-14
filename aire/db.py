@@ -36,7 +36,43 @@ SELECT e.nombre              AS estacion,
 FROM mediciones m
 JOIN estaciones e ON e.id = m.estacion_id
 GROUP BY e.nombre, m.contaminante, date(m.fecha_hora);
+
+-- Episodios marcados por el control de calidad (aire/calidad.py).
+CREATE TABLE IF NOT EXISTS incidencias_calidad (
+    estacion_id  INTEGER NOT NULL REFERENCES estaciones(id),
+    contaminante TEXT    NOT NULL,
+    inicio       TEXT    NOT NULL,
+    fin          TEXT    NOT NULL,
+    regla        TEXT    NOT NULL,
+    n_horas      INTEGER NOT NULL,
+    excluir      INTEGER NOT NULL,          -- 1 = se puede excluir; 0 = solo aviso
+    detalle      TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_qc ON incidencias_calidad (estacion_id, contaminante);
+
+-- Igual que medias_diarias, pero sin las horas de episodios con excluir = 1.
+CREATE VIEW IF NOT EXISTS medias_diarias_qc AS
+SELECT e.nombre              AS estacion,
+       m.contaminante        AS contaminante,
+       date(m.fecha_hora)    AS fecha,
+       AVG(m.valor)          AS media,
+       MAX(m.valor)          AS maximo,
+       COUNT(*)              AS n_horas
+FROM mediciones m
+JOIN estaciones e ON e.id = m.estacion_id
+WHERE NOT EXISTS (
+    SELECT 1 FROM incidencias_calidad q
+    WHERE q.estacion_id = m.estacion_id AND q.contaminante = m.contaminante
+      AND q.excluir = 1 AND m.fecha_hora BETWEEN q.inicio AND q.fin)
+GROUP BY e.nombre, m.contaminante, date(m.fecha_hora);
 """
+
+# Condición para excluir horas marcadas en consultas sobre `mediciones m`.
+_NO_EXCLUIDA = """
+          AND NOT EXISTS (
+              SELECT 1 FROM incidencias_calidad q
+              WHERE q.estacion_id = m.estacion_id AND q.contaminante = m.contaminante
+                AND q.excluir = 1 AND m.fecha_hora BETWEEN q.inicio AND q.fin)"""
 
 
 def connect(db_path: Path | str) -> sqlite3.Connection:
@@ -77,6 +113,45 @@ def load_measurements(conn: sqlite3.Connection, df: pd.DataFrame) -> int:
     return cur.rowcount
 
 
+def load_quality_flags(conn: sqlite3.Connection, flags: pd.DataFrame) -> int:
+    """Sustituye las incidencias de calidad por las de `flags` (ver aire/calidad.py)."""
+    init_db(conn)
+    conn.execute("DELETE FROM incidencias_calidad")
+    if not flags.empty:
+        ids = dict(conn.execute("SELECT nombre, id FROM estaciones").fetchall())
+        fmt = "%Y-%m-%d %H:%M:%S"
+        conn.executemany(
+            "INSERT INTO incidencias_calidad (estacion_id, contaminante, inicio, fin, regla, "
+            "n_horas, excluir, detalle) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            zip(flags["estacion"].map(ids), flags["contaminante"],
+                pd.to_datetime(flags["inicio"]).dt.strftime(fmt),
+                pd.to_datetime(flags["fin"]).dt.strftime(fmt),
+                flags["regla"], flags["n_horas"].astype(int), flags["excluir"].astype(int),
+                flags["detalle"]),
+        )
+    conn.commit()
+    return len(flags)
+
+
+def quality_flags(conn, pollutant: str, stations: list[str], start: str, end: str) -> pd.DataFrame:
+    """Incidencias de calidad que se solapan con el periodo y las estaciones elegidas."""
+    cols = ["estacion", "regla", "inicio", "fin", "n_horas", "excluir", "detalle"]
+    if not stations:
+        return pd.DataFrame(columns=cols)
+    try:
+        sql = f"""
+            SELECT e.nombre AS estacion, q.regla, q.inicio, q.fin, q.n_horas, q.excluir, q.detalle
+            FROM incidencias_calidad q JOIN estaciones e ON e.id = q.estacion_id
+            WHERE q.contaminante = ?
+              AND e.nombre IN ({_in_clause(stations)})
+              AND date(q.fin) >= ? AND date(q.inicio) <= ?
+            ORDER BY q.inicio
+        """
+        return pd.read_sql_query(sql, conn, params=[pollutant, *stations, start, end])
+    except pd.errors.DatabaseError:       # base creada antes de existir la tabla
+        return pd.DataFrame(columns=cols)
+
+
 # --------------------------------------------------------------------------- #
 # Consultas
 # --------------------------------------------------------------------------- #
@@ -99,13 +174,17 @@ def date_range(conn: sqlite3.Connection) -> tuple[str, str]:
         "SELECT date(MIN(fecha_hora)), date(MAX(fecha_hora)) FROM mediciones").fetchone()
 
 
-def daily_means(conn, pollutant: str, stations: list[str], start: str, end: str) -> pd.DataFrame:
-    """Medias diarias válidas (>= MIN_HORAS_DIA horas) por estación."""
+def daily_means(conn, pollutant: str, stations: list[str], start: str, end: str,
+                excluir_qc: bool = False) -> pd.DataFrame:
+    """Medias diarias válidas (>= MIN_HORAS_DIA horas) por estación.
+
+    Con `excluir_qc`, se descartan antes las horas marcadas por el control de calidad.
+    """
     if not stations:
         return pd.DataFrame(columns=["estacion", "fecha", "media", "maximo", "n_horas"])
     sql = f"""
         SELECT estacion, fecha, media, maximo, n_horas
-        FROM medias_diarias
+        FROM {"medias_diarias_qc" if excluir_qc else "medias_diarias"}
         WHERE contaminante = ?
           AND estacion IN ({_in_clause(stations)})
           AND fecha BETWEEN ? AND ?
@@ -117,7 +196,8 @@ def daily_means(conn, pollutant: str, stations: list[str], start: str, end: str)
     return df
 
 
-def hourly_values(conn, pollutant: str, stations: list[str], start: str, end: str) -> pd.DataFrame:
+def hourly_values(conn, pollutant: str, stations: list[str], start: str, end: str,
+                  excluir_qc: bool = False) -> pd.DataFrame:
     if not stations:
         return pd.DataFrame(columns=["estacion", "fecha_hora", "valor"])
     sql = f"""
@@ -125,7 +205,7 @@ def hourly_values(conn, pollutant: str, stations: list[str], start: str, end: st
         FROM mediciones m JOIN estaciones e ON e.id = m.estacion_id
         WHERE m.contaminante = ?
           AND e.nombre IN ({_in_clause(stations)})
-          AND date(m.fecha_hora) BETWEEN ? AND ?
+          AND date(m.fecha_hora) BETWEEN ? AND ?{_NO_EXCLUIDA if excluir_qc else ""}
         ORDER BY m.fecha_hora
     """
     df = pd.read_sql_query(sql, conn, params=[pollutant, *stations, start, end])
@@ -133,7 +213,8 @@ def hourly_values(conn, pollutant: str, stations: list[str], start: str, end: st
     return df
 
 
-def weekly_profile(conn, pollutant: str, stations: list[str], start: str, end: str) -> pd.DataFrame:
+def weekly_profile(conn, pollutant: str, stations: list[str], start: str, end: str,
+                   excluir_qc: bool = False) -> pd.DataFrame:
     """Media por día de la semana (0 = lunes) y hora del día."""
     if not stations:
         return pd.DataFrame(columns=["dia_semana", "hora", "media"])
@@ -145,7 +226,7 @@ def weekly_profile(conn, pollutant: str, stations: list[str], start: str, end: s
         FROM mediciones m JOIN estaciones e ON e.id = m.estacion_id
         WHERE m.contaminante = ?
           AND e.nombre IN ({_in_clause(stations)})
-          AND date(m.fecha_hora) BETWEEN ? AND ?
+          AND date(m.fecha_hora) BETWEEN ? AND ?{_NO_EXCLUIDA if excluir_qc else ""}
         GROUP BY dia_semana, hora
         ORDER BY dia_semana, hora
     """

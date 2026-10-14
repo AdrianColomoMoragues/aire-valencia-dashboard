@@ -17,7 +17,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-from . import db
+from . import calidad, db
 from .config import CONTAMINANTES, DATASET_URL, DB_PATH, RAW_DIR, ROOT
 
 log = logging.getLogger("aire.etl")
@@ -250,7 +250,16 @@ def run(csv_path: Path, db_path: Path = DB_PATH) -> int:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     with db.connect(db_path) as conn:
         n = db.load_measurements(conn, clean)
-    log.info("Cargadas %s mediciones en %s", f"{n:,}", _display_path(db_path))
+        log.info("Cargadas %s mediciones en %s", f"{n:,}", _display_path(db_path))
+        flags = calidad.detectar(clean)
+        db.load_quality_flags(conn, flags)
+    if flags.empty:
+        log.info("Control de calidad: sin incidencias")
+    else:
+        resumen = flags.groupby("regla").agg(episodios=("n_horas", "size"), horas=("n_horas", "sum"))
+        for regla, r in resumen.iterrows():
+            log.info("Control de calidad · %-16s %4d episodios · %s h", regla, r.episodios,
+                     f"{int(r.horas):,}")
     return n
 
 

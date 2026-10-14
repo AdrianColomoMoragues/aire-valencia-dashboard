@@ -42,12 +42,18 @@ def catalog():
 
 
 @st.cache_data
-def load(pollutant: str, stations: tuple[str, ...], start: str, end: str):
+def load(pollutant: str, stations: tuple[str, ...], start: str, end: str, excluir_qc: bool = False):
     conn = get_conn()
-    daily = db.daily_means(conn, pollutant, list(stations), start, end)
-    hourly = db.hourly_values(conn, pollutant, list(stations), start, end) if pollutant == "O3" else None
-    profile = db.weekly_profile(conn, pollutant, list(stations), start, end)
+    est = list(stations)
+    daily = db.daily_means(conn, pollutant, est, start, end, excluir_qc)
+    hourly = db.hourly_values(conn, pollutant, est, start, end, excluir_qc) if pollutant == "O3" else None
+    profile = db.weekly_profile(conn, pollutant, est, start, end, excluir_qc)
     return daily, hourly, profile
+
+
+@st.cache_data
+def load_flags(pollutant: str, stations: tuple[str, ...], start: str, end: str):
+    return db.quality_flags(get_conn(), pollutant, list(stations), start, end)
 
 
 # --------------------------------------------------------------------------- #
@@ -78,7 +84,15 @@ if not selected or not isinstance(rango, tuple) or len(rango) != 2:
     st.stop()
 
 start, end = (d.isoformat() for d in rango)
-daily, hourly, profile = load(pollutant, tuple(selected), start, end)
+flags = load_flags(pollutant, tuple(selected), start, end)
+horas_excluibles = int(flags.loc[flags["excluir"] == 1, "n_horas"].sum())
+excluir_qc = st.toggle(
+    f"Excluir datos sospechosos del control de calidad ({horas_excluibles:,} h en esta selección)",
+    value=False, disabled=horas_excluibles == 0,
+    help="Quita las horas con valores atascados (≥ 12 h iguales) y las derivas del O₃. "
+         "Los picos aislados solo se avisan: pueden ser eventos reales, como la Cremà.",
+)
+daily, hourly, profile = load(pollutant, tuple(selected), start, end, excluir_qc)
 if daily.empty:
     st.warning("No hay datos para esa combinación de filtros.")
     st.stop()
@@ -154,6 +168,25 @@ with right:
     heat.update_layout(height=380, margin=dict(l=10, r=10, t=10, b=10),
                        xaxis_title="Hora del día", yaxis_autorange="reversed")
     st.plotly_chart(heat, width="stretch", theme="streamlit")
+
+# ---- Control de calidad ---------------------------------------------------- #
+REGLAS = {"valor_atascado": "Valor atascado", "pico_aislado": "Pico aislado",
+          "deriva_regional": "Deriva respecto al resto"}
+with st.expander(f"Control de calidad · {len(flags)} incidencias en esta selección"):
+    if flags.empty:
+        st.write("Ninguna regla ha marcado datos de este contaminante en la selección.")
+    else:
+        st.caption("Las incidencias se marcan pero no se borran. **Excluible** = se quita al activar "
+                   "el interruptor de arriba; **aviso** = solo informativo (puede ser un evento real).")
+        st.dataframe(
+            flags.assign(regla=flags["regla"].map(REGLAS),
+                         accion=flags["excluir"].map({1: "Excluible", 0: "Aviso"}))
+                 .rename(columns={"estacion": "Estación", "regla": "Regla", "inicio": "Inicio",
+                                  "fin": "Fin", "n_horas": "Horas", "accion": "Acción",
+                                  "detalle": "Detalle"})
+                 [["Estación", "Regla", "Inicio", "Fin", "Horas", "Acción", "Detalle"]],
+            hide_index=True, width="stretch",
+        )
 
 # ---- Tabla ----------------------------------------------------------------- #
 with st.expander("Ver tabla resumen por estación"):

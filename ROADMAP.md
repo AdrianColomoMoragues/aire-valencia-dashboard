@@ -24,7 +24,7 @@ La base ya funciona. Estas mejoras están ordenadas de más fácil a más ambici
 
 ## 5. Visualización y calidad de datos (surgidas de la Fase 1)
 - [x] **Escala del eje Y**: si la guía OMS supera en más de 3× los datos (CO, SO₂), el eje se ajusta a los datos y la guía se muestra como texto.
-- [ ] **Control de calidad de sensores**: marcar tramos sospechosos (p. ej. O₃ de Puerto Valencia en la segunda mitad de 2018, valores de suelo 1,0).
+- [x] **Control de calidad de sensores** (`aire/calidad.py`): valores atascados, picos aislados (solo aviso) y deriva regional del O₃; se marcan sin borrar y se pueden excluir desde el dashboard.
 - [ ] **Comparar en el periodo común** cuando las estaciones tienen periodos distintos (las del puerto).
 
 ## Ideas para el commit history
