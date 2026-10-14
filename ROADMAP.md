@@ -3,7 +3,7 @@
 La base ya funciona. Estas mejoras están ordenadas de más fácil a más ambiciosa. Haz al menos 2 o 3 antes de publicar: así el proyecto es tuyo y puedes defenderlo en una entrevista.
 
 ## 1. Primeros pasos (imprescindible)
-- [ ] Ejecuta `python -m aire.etl` con el **dataset real** y revisa los logs: cuántas filas se descartan y por qué. Si algún formato de fecha u hora no se reconoce, ajusta `_parse_date` / `_parse_hour` y añade un test con ese caso.
+- [x] Ejecuta `python -m aire.etl` con el **dataset real** y revisa los logs: cuántas filas se descartan y por qué. Si algún formato de fecha u hora no se reconoce, ajusta `_parse_date` / `_parse_hour` y añade un test con ese caso.
 - [ ] Haz una captura o GIF del dashboard, guárdala en `docs/` y enlázala en el README.
 - [ ] Despliega en [Streamlit Community Cloud](https://streamlit.io/cloud). Para no subir la base de datos, ejecuta el ETL `--sample` al arrancar o sube un `.parquet` pequeño.
 
@@ -21,6 +21,11 @@ La base ya funciona. Estas mejoras están ordenadas de más fácil a más ambici
 - [ ] Cambia SQLite por **PostgreSQL** con `docker-compose` (solo cambia `db.connect` y la sintaxis de fechas).
 - [ ] Ejecuta el ETL periódicamente con un workflow programado de GitHub Actions.
 - [ ] Añade `ruff` al CI para el linting.
+
+## 5. Visualización y calidad de datos (surgidas de la Fase 1)
+- [x] **Escala del eje Y**: si la guía OMS supera en más de 3× los datos (CO, SO₂), el eje se ajusta a los datos y la guía se muestra como texto.
+- [ ] **Control de calidad de sensores**: marcar tramos sospechosos (p. ej. O₃ de Puerto Valencia en la segunda mitad de 2018, valores de suelo 1,0).
+- [ ] **Comparar en el periodo común** cuando las estaciones tienen periodos distintos (las del puerto).
 
 ## Ideas para el commit history
 Haz commits pequeños y descriptivos, por ejemplo:

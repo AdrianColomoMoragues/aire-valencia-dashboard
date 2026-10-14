@@ -62,3 +62,26 @@ def serie_diaria_continua(indicator: pd.DataFrame, ventana_dias: int | None = No
     if not out:
         return pd.DataFrame(columns=["estacion", "fecha", "valor"])
     return pd.concat(out, ignore_index=True)
+
+
+FACTOR_GUIA_FUERA_DE_ESCALA = 3.0
+
+
+def guia_en_escala(guia: float, max_dato: float, factor: float = FACTOR_GUIA_FUERA_DE_ESCALA) -> bool:
+    """¿Se dibuja la guía OMS como línea dentro del eje?
+
+    Si la guía supera en más de `factor` veces el máximo de lo que se dibuja
+    (p. ej. CO: guía 4 mg/m³ con datos de 0,1–0,4), estirar el eje hasta la guía
+    aplasta las series contra el cero. En ese caso el eje se ajusta a los datos
+    y la guía se indica con un texto.
+    """
+    if max_dato is None or pd.isna(max_dato) or max_dato <= 0:
+        return True
+    return guia <= factor * max_dato
+
+
+def texto_guia_fuera_de_escala(guia: float, unidad: str, metrica: str, max_dato: float) -> str:
+    """Texto que sustituye a la línea de la guía cuando queda fuera de escala."""
+    veces = guia / max_dato
+    return (f"Guía OMS: {guia:g} {unidad} ({metrica}) · fuera de escala, "
+            f"{veces:.0f}× el máximo mostrado")

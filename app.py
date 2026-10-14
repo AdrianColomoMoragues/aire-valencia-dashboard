@@ -7,14 +7,19 @@ from __future__ import annotations
 
 from datetime import date
 
-import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
 from aire import db
 from aire.config import DATASET_PAGE, DB_PATH, GUIAS_OMS
-from aire.indicadores import daily_indicator, exceedance_summary, serie_diaria_continua
+from aire.indicadores import (
+    daily_indicator,
+    exceedance_summary,
+    guia_en_escala,
+    serie_diaria_continua,
+    texto_guia_fuera_de_escala,
+)
 
 st.set_page_config(page_title="Calidad del aire · València", page_icon="🌬️", layout="wide")
 
@@ -98,9 +103,18 @@ suavizar = st.toggle("Suavizar (media móvil de 7 días)", value=True)
 plot_df = serie_diaria_continua(indicator, ventana_dias=7 if suavizar else None)
 fig = px.line(plot_df, x="fecha", y="valor", color="estacion", color_discrete_map=color_map,
               labels={"fecha": "", "valor": f"{pollutant} ({guia['unidad']})", "estacion": "Estación"})
-fig.add_hline(y=guia["valor"], line_dash="dash", line_color="#898781", line_width=1.5,
-              annotation_text=f"Guía OMS: {guia['valor']} ({guia['metrica']})",
-              annotation_position="top left")
+max_linea = plot_df["valor"].max()
+if guia_en_escala(guia["valor"], max_linea):
+    fig.add_hline(y=guia["valor"], line_dash="dash", line_color="#898781", line_width=1.5,
+                  annotation_text=f"Guía OMS: {guia['valor']} ({guia['metrica']})",
+                  annotation_position="top left")
+else:
+    # La guía aplastaría las series: el eje se ajusta a los datos y la guía va como texto.
+    fig.update_yaxes(rangemode="tozero")
+    fig.add_annotation(xref="paper", yref="paper", x=0, y=1.06, showarrow=False,
+                       xanchor="left", font=dict(size=12, color="#898781"),
+                       text="⬆ " + texto_guia_fuera_de_escala(guia["valor"], guia["unidad"],
+                                                              guia["metrica"], max_linea))
 fig.update_traces(line_width=2)
 fig.update_layout(hovermode="x unified", legend_title_text="", height=420,
                   margin=dict(l=10, r=10, t=30, b=10))
@@ -115,8 +129,17 @@ with left:
                  color="estacion", color_discrete_map=color_map,
                  labels={"media": f"Media ({guia['unidad']})", "estacion": ""},
                  hover_data={"dias_sobre_guia": True, "pct_sobre_guia": ":.1f"})
-    bar.add_vline(x=guia["valor"], line_dash="dash", line_color="#898781", line_width=1.5)
-    bar.update_layout(showlegend=False, height=380, margin=dict(l=10, r=10, t=10, b=10))
+    max_barra = summary["media"].max()
+    if guia_en_escala(guia["valor"], max_barra):
+        bar.add_vline(x=guia["valor"], line_dash="dash", line_color="#898781", line_width=1.5)
+        margen_sup = 10
+    else:
+        bar.add_annotation(xref="paper", yref="paper", x=1, y=1.02, showarrow=False,
+                           xanchor="right", yanchor="bottom", font=dict(size=12, color="#898781"),
+                           text="➡ " + texto_guia_fuera_de_escala(guia["valor"], guia["unidad"],
+                                                                  guia["metrica"], max_barra))
+        margen_sup = 30
+    bar.update_layout(showlegend=False, height=380, margin=dict(l=10, r=10, t=margen_sup, b=10))
     st.plotly_chart(bar, width="stretch", theme="streamlit")
 
 with right:

@@ -2,7 +2,14 @@ import pandas as pd
 import pytest
 
 from aire import db, etl
-from aire.indicadores import daily_indicator, exceedance_summary, o3_max_8h, serie_diaria_continua
+from aire.indicadores import (
+    daily_indicator,
+    exceedance_summary,
+    guia_en_escala,
+    o3_max_8h,
+    serie_diaria_continua,
+    texto_guia_fuera_de_escala,
+)
 from aire.sample import write_sample_csv
 
 
@@ -166,3 +173,20 @@ def test_serie_continua_corta_la_linea_en_los_huecos():
     assert s.loc["2020-01-03":"2020-02-29"].isna().all()  # el hueco queda vacío, no se une
     suav = serie_diaria_continua(ind, ventana_dias=7).set_index("fecha")["valor"]
     assert suav.loc["2020-03-01"] != 25.0                 # no mezcla valores separados por meses
+
+
+@pytest.mark.parametrize(("guia", "max_dato", "esperado"), [
+    (4, 0.4, False),     # CO: la guía es 10 veces el máximo -> fuera de escala
+    (40, 9.8, False),    # SO2: 4 veces
+    (25, 83.8, True),    # NO2: la guía está dentro de los datos
+    (45, 21.5, True),    # PM10 en barras: ~2 veces, se sigue dibujando
+    (30, 10, True),      # justo en el límite (3x) se dibuja
+    (4, float("nan"), True),   # sin datos: no se oculta la guía
+])
+def test_guia_en_escala(guia, max_dato, esperado):
+    assert guia_en_escala(guia, max_dato) is esperado
+
+
+def test_texto_guia_fuera_de_escala():
+    texto = texto_guia_fuera_de_escala(4, "mg/m³", "media diaria", 0.4)
+    assert texto == "Guía OMS: 4 mg/m³ (media diaria) · fuera de escala, 10× el máximo mostrado"
