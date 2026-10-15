@@ -4,7 +4,7 @@
 
 Dashboard web que analiza los datos horarios de la **Red Valenciana de Vigilancia y Control de la Contaminación Atmosférica (RVVCCA)** en la ciudad de València y los compara con las **guías de calidad del aire de la OMS (2021)**.
 
-> 🔗 **Demo:** *(enlace de Streamlit Community Cloud, pendiente de publicar)*
+> 🔗 **Demo en vivo: [aire-valencia.streamlit.app](https://aire-valencia.streamlit.app/)** · si la app lleva días sin visitas, Streamlit la pone en reposo y tarda unos segundos en despertar.
 
 ![Explorador del dashboard](docs/dashboard.png)
 

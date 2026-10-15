@@ -5,7 +5,7 @@ La base ya funciona. Estas mejoras están ordenadas de más fácil a más ambici
 ## 1. Primeros pasos (imprescindible)
 - [x] Ejecuta `python -m aire.etl` con el **dataset real** y revisa los logs: cuántas filas se descartan y por qué. Si algún formato de fecha u hora no se reconoce, ajusta `_parse_date` / `_parse_hour` y añade un test con ese caso.
 - [x] Haz una captura o GIF del dashboard, guárdala en `docs/` y enlázala en el README.
-- [ ] Despliega en [Streamlit Community Cloud](https://streamlit.io/cloud). *(Preparado: la app crea la base desde `snapshot/mediciones.parquet` al arrancar; falta publicarla.)*
+- [x] Despliega en [Streamlit Community Cloud](https://streamlit.io/cloud): [https://aire-valencia.streamlit.app/](https://aire-valencia.streamlit.app/). La app crea la base desde `snapshot/mediciones.parquet` al arrancar.
 
 ## 2. Análisis (lo que más luce en Ciencia de Datos)
 - [x] **Efecto del confinamiento de 2020** (hecho: página `Confinamiento 2020`, `aire/confinamiento.py`): compara NO₂ de marzo a mayo de 2020 con la media de 2016-2019 en las mismas semanas. Añádelo como pestaña con un gráfico de antes y después.
