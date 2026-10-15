@@ -8,7 +8,7 @@ La base ya funciona. Estas mejoras están ordenadas de más fácil a más ambici
 - [ ] Despliega en [Streamlit Community Cloud](https://streamlit.io/cloud). Para no subir la base de datos, ejecuta el ETL `--sample` al arrancar o sube un `.parquet` pequeño.
 
 ## 2. Análisis (lo que más luce en Ciencia de Datos)
-- [ ] **Efecto del confinamiento de 2020**: compara NO₂ de marzo a mayo de 2020 con la media de 2016-2019 en las mismas semanas. Añádelo como pestaña con un gráfico de antes y después.
+- [x] **Efecto del confinamiento de 2020** (hecho: página `Confinamiento 2020`, `aire/confinamiento.py`): compara NO₂ de marzo a mayo de 2020 con la media de 2016-2019 en las mismas semanas. Añádelo como pestaña con un gráfico de antes y después.
 - [ ] **Correlaciones** entre contaminantes y meteorología (el CSV trae viento, temperatura y humedad). Por ejemplo, ¿baja el NO₂ con viento fuerte?
 - [ ] **Tendencia** a largo plazo con una descomposición STL (`statsmodels`) para separar tendencia, estacionalidad y ruido.
 

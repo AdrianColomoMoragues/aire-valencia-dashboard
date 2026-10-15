@@ -17,6 +17,9 @@ Dashboard web que analiza los datos horarios de la **Red Valenciana de Vigilanci
   - Comparativa entre estaciones.
   - Mapa de calor día de la semana × hora (se ven los picos de tráfico).
   - Tabla resumen descargable en CSV.
+  - Interruptor para excluir los datos marcados por el control de calidad.
+- **Control de calidad de sensores**: detecta valores atascados, picos aislados y derivas del O₃ respecto al resto de la red. Los datos se marcan sin borrarlos, y la regla de deriva encontró sola un fallo real del sensor de O₃ de Puerto Valencia en 2018.
+- **Análisis del confinamiento de 2020** (página propia del dashboard): diferencia en diferencias frente a 2016–2019, comparación con la variación de un año normal y prueba placebo con 2021. Resultado: **el NO₂ bajó ~60 %** en el confinamiento; en partículas y O₃ el efecto no es concluyente.
 - **Métricas correctas para cada contaminante**: media diaria para PM, NO₂ y SO₂, y máximo diario de la media móvil de 8 h para O₃, como define la OMS. Solo se cuentan días con al menos el 75 % de horas (criterio de la UE).
 - **Tests con pytest** y **CI con GitHub Actions**.
 
@@ -68,10 +71,14 @@ aire-valencia-dashboard/
 │   ├── config.py        # URLs, contaminantes y guías OMS
 │   ├── etl.py           # extract → transform → load (CLI)
 │   ├── db.py            # esquema SQL y consultas
-│   ├── indicadores.py   # métricas diarias y superaciones
+│   ├── indicadores.py   # métricas diarias, superaciones y escala de la guía
+│   ├── calidad.py       # control de calidad de sensores
+│   ├── confinamiento.py # efecto del confinamiento de 2020
 │   └── sample.py        # generador de datos sintéticos
-├── tests/test_etl.py
-├── app.py               # dashboard Streamlit
+├── pages/1_Confinamiento_2020.py   # página del dashboard
+├── tests/               # 32 tests (ETL, calidad, confinamiento)
+├── Documentation.ipynb  # informe técnico
+├── app.py               # dashboard Streamlit (página principal)
 └── .github/workflows/ci.yml
 ```
 
