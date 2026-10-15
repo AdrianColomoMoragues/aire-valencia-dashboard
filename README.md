@@ -4,8 +4,11 @@
 
 Dashboard web que analiza los datos horarios de la **Red Valenciana de Vigilancia y Control de la Contaminación Atmosférica (RVVCCA)** en la ciudad de València y los compara con las **guías de calidad del aire de la OMS (2021)**.
 
-> 📸 *Añade aquí una captura o GIF del dashboard (`docs/dashboard.png`).*
-> 🔗 *Demo: añade aquí el enlace de Streamlit Community Cloud cuando lo despliegues.*
+> 🔗 **Demo:** *(enlace de Streamlit Community Cloud, pendiente de publicar)*
+
+![Explorador del dashboard](docs/dashboard.png)
+
+![Página del confinamiento de 2020](docs/confinamiento.png)
 
 ## Qué hace
 
@@ -63,6 +66,17 @@ Tests:
 pytest -q
 ```
 
+## Despliegue (Streamlit Community Cloud)
+
+`data/` no se sube al repositorio (el CSV ocupa 48 MB y `aire.db`, 175 MB). En su lugar se sube `snapshot/mediciones.parquet` (~5 MB): las mediciones ya limpias, con las fechas corregidas. En el primer arranque, la app crea `aire.db` a partir de ese archivo (~20 s) y vuelve a aplicar el control de calidad. No depende de que el portal de datos abiertos esté disponible.
+
+Si cambias el ETL, regenera el extracto y súbelo:
+
+```bash
+python -m aire.etl --file data/raw/rvvcca.-datos-horarios-valencia-2016-2021-curt-cas.csv
+python -m aire.snapshot
+```
+
 ## Estructura
 
 ```
@@ -74,11 +88,17 @@ aire-valencia-dashboard/
 │   ├── indicadores.py   # métricas diarias, superaciones y escala de la guía
 │   ├── calidad.py       # control de calidad de sensores
 │   ├── confinamiento.py # efecto del confinamiento de 2020
-│   └── sample.py        # generador de datos sintéticos
-├── pages/1_Confinamiento_2020.py   # página del dashboard
-├── tests/               # 32 tests (ETL, calidad, confinamiento)
+│   ├── sample.py        # generador de datos sintéticos
+│   ├── snapshot.py      # extracto Parquet para desplegar sin data/
+│   └── app_utils.py     # arranque de datos y conexión compartidos por las páginas
+├── paginas/
+│   ├── explorador.py          # página principal
+│   └── confinamiento_2020.py  # análisis del confinamiento
+├── snapshot/mediciones.parquet  # datos limpios (~5 MB) para la nube
+├── docs/                # capturas para el README
+├── tests/               # 34 tests (ETL, calidad, confinamiento, extracto)
 ├── Documentation.ipynb  # informe técnico
-├── app.py               # dashboard Streamlit (página principal)
+├── app.py               # punto de entrada: navegación entre páginas
 └── .github/workflows/ci.yml
 ```
 

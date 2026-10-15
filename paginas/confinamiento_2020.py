@@ -7,19 +7,14 @@ import streamlit as st
 
 from aire import confinamiento as cf
 from aire import db
-from aire.config import DB_PATH, GUIAS_OMS
+from aire.app_utils import datos_o_parar, get_conn
+from aire.config import GUIAS_OMS
 
-st.set_page_config(page_title="Confinamiento 2020 · Calidad del aire", page_icon="🏠", layout="wide")
 
 AZUL, NARANJA, GRIS, GRIS_CLARO = "#2a78d6", "#eb6834", "#898781", "rgba(137,135,129,0.22)"
 CONTAMINANTES = ["NO2", "PM10", "PM2.5", "O3"]
 VEREDICTO = {"claro": "✅ Efecto claro", "no concluyente": "➖ No concluyente",
              "descriptiva": "ℹ️ Solo descriptiva", "sin datos suficientes": "— Sin datos suficientes"}
-
-
-@st.cache_resource
-def get_conn():
-    return db.connect(DB_PATH)
 
 
 @st.cache_data
@@ -31,9 +26,7 @@ def cargar(pollutant: str):
             cf.serie_semanal(daily, anio=cf.PLACEBO))
 
 
-if not DB_PATH.exists():
-    st.error("No encuentro la base de datos. Ejecuta antes `python -m aire.etl`.")
-    st.stop()
+datos_o_parar()
 
 st.title("🏠 ¿Cuánto bajó la contaminación con el confinamiento de 2020?")
 st.caption("Cada fase de 2020 se compara con las mismas fechas de 2016–2019, con las mismas estaciones, "
@@ -53,14 +46,16 @@ conf = res.set_index("fase").loc["Confinamiento"]
 hib = res.set_index("fase").loc["Hibernación"]
 k1, k2, k3 = st.columns(3)
 k1.metric("Confinamiento (14 mar–17 may)", f"{conf['efecto']:+.0f} %",
-          delta=f"bruta {conf['variacion_bruta']:+.0f} %", delta_color="off",
           help="Efecto ajustado: variación frente a 2016–2019 menos la que ya había antes del 14 de marzo.")
 k2.metric("Hibernación (30 mar–9 abr)", f"{hib['efecto']:+.0f} %",
-          delta=f"bruta {hib['variacion_bruta']:+.0f} %", delta_color="off",
           help="Solo trabajadores esenciales: la fase más estricta.")
 k3.metric("Veredicto en el confinamiento", VEREDICTO.get(conf["veredicto"], conf["veredicto"]),
           help="Claro = la variación bruta y la ajustada salen del rango de un año normal, todas las "
                "estaciones van en el mismo sentido y 2021 (placebo) no muestra nada parecido.")
+
+st.caption(f"Efecto ajustado. Sin ajustar (variación bruta frente a 2016–2019): "
+           f"{conf['variacion_bruta']:+.0f} % en el confinamiento y {hib['variacion_bruta']:+.0f} % "
+           f"en la hibernación.")
 
 # ---- Serie semanal ---------------------------------------------------------- #
 st.subheader(f"{pollutant} semanal: 2020 frente a 2016–2019")
